@@ -148,6 +148,9 @@ class CheckpointFunction(torch.autograd.Function):
         return (None, None) + input_grads
 
 
+freqs = None
+
+
 def timestep_embedding(timesteps, dim, max_period=10000, repeat_only=False):
     """
     Create sinusoidal timestep embeddings.
@@ -159,9 +162,11 @@ def timestep_embedding(timesteps, dim, max_period=10000, repeat_only=False):
     """
     if not repeat_only:
         half = dim // 2
-        freqs = torch.exp(
-            -math.log(max_period) * torch.arange(start=0, end=half, dtype=torch.float32) / half
-        ).to(device=timesteps.device)
+        global freqs
+        if freqs is None:
+            freqs = torch.exp(
+                -math.log(max_period) * torch.arange(start=0, end=half, dtype=torch.float32, device=timesteps.device) / half
+            )
         args = timesteps[:, None].float() * freqs[None]
         embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
         if dim % 2:
@@ -213,7 +218,7 @@ class SiLU(nn.Module):
 
 class GroupNorm32(nn.GroupNorm):
     def forward(self, x):
-        return super().forward(x.float()).type(x.dtype)
+        return super().forward(x) #.type(x.dtype)
 
 def conv_nd(dims, *args, **kwargs):
     """
