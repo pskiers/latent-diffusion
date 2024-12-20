@@ -240,7 +240,7 @@ class DDPM(pl.LightningModule):
         model_mean, posterior_variance, posterior_log_variance = self.q_posterior(x_start=x_recon, x_t=x, t=t)
         return model_mean, posterior_variance, posterior_log_variance
 
-    @torch.no_grad()
+    # @torch.no_grad()
     def p_sample(self, x, t, clip_denoised=True, repeat_noise=False):
         b, *_, device = *x.shape, x.device
         model_mean, _, model_log_variance = self.p_mean_variance(x=x, t=t, clip_denoised=clip_denoised)
@@ -250,10 +250,10 @@ class DDPM(pl.LightningModule):
         return model_mean + nonzero_mask * (0.5 * model_log_variance).exp() * noise
 
     @torch.no_grad()
-    def p_sample_loop(self, shape, return_intermediates=False):
+    def p_sample_loop(self, shape, return_intermediates=False, x_start=None):
         device = self.betas.device
         b = shape[0]
-        img = torch.randn(shape, device=device)
+        img = torch.randn(shape, device=device) if x_start is None else x_start.clone().to(device)
         intermediates = [img]
         for i in tqdm(reversed(range(0, self.num_timesteps)), desc='Sampling t', total=self.num_timesteps):
             img = self.p_sample(img, torch.full((b,), i, device=device, dtype=torch.long),
@@ -265,11 +265,11 @@ class DDPM(pl.LightningModule):
         return img
 
     @torch.no_grad()
-    def sample(self, batch_size=16, return_intermediates=False):
+    def sample(self, batch_size=16, return_intermediates=False, x_start=None):
         image_size = self.image_size
         channels = self.channels
         return self.p_sample_loop((batch_size, channels, image_size, image_size),
-                                  return_intermediates=return_intermediates)
+                                  return_intermediates=return_intermediates, x_start=x_start)
 
     def q_sample(self, x_start, t, noise=None):
         noise = default(noise, lambda: torch.randn_like(x_start))
@@ -330,7 +330,7 @@ class DDPM(pl.LightningModule):
         x = batch[k]
         if len(x.shape) == 3:
             x = x[..., None]
-        x = rearrange(x, 'b h w c -> b c h w')
+        # x = rearrange(x, 'b h w c -> b c h w') # TODO UNCOMMENT THIS LATER
         x = x.to(memory_format=torch.contiguous_format).float()
         return x
 
